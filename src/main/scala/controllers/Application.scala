@@ -40,7 +40,7 @@ object Application extends App with TodoJsonSerializer with SprayJsonSupport {
       }
     } ~ get {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
-        complete(s"get todo with a id: $id")
+        complete((todoActor ? GetTodoById(id)).mapTo[Option[Todo]])
       } ~ pathEndOrSingleSlash {
         complete((todoActor ? GetAllTodos).mapTo[List[Todo]])
       }
@@ -49,7 +49,11 @@ object Application extends App with TodoJsonSerializer with SprayJsonSupport {
         complete(s"update todo with id: $id")
       }
     } ~ post {
-      complete("Create a new todo")
+      entity(as[Todo]) { todo =>
+        {
+          complete((todoActor ? CreateTodo(todo)).map(_ => StatusCodes.Created))
+        }
+      }
     } ~ delete {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
         complete(s"delete todo with id: $id")

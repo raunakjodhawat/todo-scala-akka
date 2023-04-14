@@ -2,7 +2,7 @@ package com.raunakjodhawat
 package controllers
 
 import akka.actor.{Actor, ActorLogging}
-import com.sun.tools.javac.comp.Todo
+import com.raunakjodhawat.models.Todo
 
 object TodoActor {
   case object GetAllTodos

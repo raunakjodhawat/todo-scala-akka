@@ -6,7 +6,7 @@ import spray.json.DefaultJsonProtocol
 case class Todo(
     title: String,
     description: String,
-    isComplete: Boolean = false
+    isComplete: Boolean
 )
 
 trait TodoJsonSerializer extends DefaultJsonProtocol {
