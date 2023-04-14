@@ -1,15 +1,28 @@
 package com.raunakjodhawat
 package controllers
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import models.{Todo, TodoJsonSerializer}
 
-object Application extends App {
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.pattern.ask
+import akka.util.Timeout
+import spray.json._
+
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+
+object Application extends App with TodoJsonSerializer with SprayJsonSupport {
+  import TodoActor._
+  import system.dispatcher
   implicit val system = ActorSystem("todo-actor-system")
+  implicit val timeout = Timeout(2.seconds)
 
+  val todoActor = system.actorOf(Props[TodoActor], "todo-actor")
   /*
   prefix: /api/todo
 
@@ -29,7 +42,7 @@ object Application extends App {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
         complete(s"get todo with a id: $id")
       } ~ pathEndOrSingleSlash {
-        complete("get all todo")
+        complete((todoActor ? GetAllTodos).mapTo[List[Todo]])
       }
     } ~ put {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
