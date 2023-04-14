@@ -11,6 +11,7 @@ import models.{Todo, TodoJsonSerializer}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.pattern.ask
 import akka.util.Timeout
+import com.raunakjodhawat.controllers
 import spray.json._
 
 import scala.concurrent.Future
@@ -36,7 +37,16 @@ object Application extends App with TodoJsonSerializer with SprayJsonSupport {
   val route: Route = pathPrefix("api" / "todo") {
     (pathPrefix("changeStatus") & put) {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
-        complete(s"changeStatus for: $id")
+        complete(
+          (todoActor ? ChangeStatus(id)).mapTo[ChangeStatusResponse].map {
+            changeStatusResponse =>
+              if (changeStatusResponse.changeStatusSuccess) {
+                StatusCodes.OK
+              } else {
+                StatusCodes.BadRequest
+              }
+          }
+        )
       }
     } ~ get {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
@@ -46,7 +56,18 @@ object Application extends App with TodoJsonSerializer with SprayJsonSupport {
       }
     } ~ put {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
-        complete(s"update todo with id: $id")
+        entity(as[Todo]) { todo =>
+          complete(
+            (todoActor ? UpdateTodo(id, todo)).mapTo[UpdateResponse].map {
+              updateResponse =>
+                if (updateResponse.updateSuccess) {
+                  StatusCodes.OK
+                } else {
+                  StatusCodes.BadRequest
+                }
+            }
+          )
+        }
       }
     } ~ post {
       entity(as[Todo]) { todo =>
@@ -56,7 +77,7 @@ object Application extends App with TodoJsonSerializer with SprayJsonSupport {
       }
     } ~ delete {
       (path(IntNumber) | parameter(Symbol("id").as[Int])) { id =>
-        complete(s"delete todo with id: $id")
+        complete((todoActor ? DeleteTodo(id)).map(_ => StatusCodes.OK))
       }
     }
   }
