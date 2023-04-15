@@ -1,8 +1,10 @@
 package com.raunakjodhawat
 package controllers
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.ActorLogging
 import models.Todo
+
+import akka.persistence.{PersistentActor, RecoveryCompleted}
 
 trait UpdateResponse {
   val updateSuccess: Boolean
@@ -35,44 +37,72 @@ object TodoActor {
   case object ChangeStatusFailure extends ChangeStatusResponse {
     override val changeStatusSuccess: Boolean = false
   }
+
+  case class PersistenceData(lastToDoId: Int, todos: Map[Int, Todo])
 }
 
-class TodoActor extends Actor with ActorLogging {
+class TodoActor extends PersistentActor with ActorLogging {
   import TodoActor._
   var todos = Map[Int, Todo]()
-  var lastTodoId = 0
-  override def receive: Receive = {
+  var lastTodoId = -1
+  override def onPersistFailure(
+      cause: Throwable,
+      event: Any,
+      seqNr: Long
+  ): Unit = {
+    log.error(s"Failed to persist data: ${cause.getMessage}")
+    super.onPersistFailure(cause, event, seqNr)
+  }
+  override def receiveRecover: Receive = {
+    case PersistenceData(id, persistedTodos) => {
+      todos = persistedTodos
+      lastTodoId = id
+    }
+    case RecoveryCompleted =>
+      log.info("recovery completed")
+  }
+
+  override def receiveCommand: Receive = {
     case GetAllTodos =>
       sender() ! todos.values.toList
     case GetTodoById(id) =>
       sender() ! todos.get(id)
     case CreateTodo(todo) =>
-      todos = todos + (lastTodoId -> todo)
-      sender() ! CreateTodoSuccess
       lastTodoId += 1
+      todos = todos + (lastTodoId -> todo)
+      persist(PersistenceData(lastTodoId, todos)) { _ =>
+        sender() ! CreateTodoSuccess
+      }
     case UpdateTodo(id, todo) =>
       val oldTodo = todos.get(id)
       oldTodo match {
-        case Some(t) =>
+        case Some(_) =>
           todos = todos + (id -> todo)
-          sender() ! UpdateSuccess
+          persist(PersistenceData(lastTodoId, todos)) { _ =>
+            sender() ! UpdateSuccess
+          }
         case None =>
           sender() ! UpdateFailure
       }
 
     case DeleteTodo(id) =>
       todos = todos - id
-      sender() ! DeleteComplete
+      persist(PersistenceData(lastTodoId, todos)) { _ =>
+        sender() ! DeleteComplete
+      }
 
     case ChangeStatus(id) =>
       val todo = todos.get(id)
       todo match {
-        case Some(t) => {
+        case Some(t) =>
           todos = todos + (id -> Todo(t.title, t.description, !t.isComplete))
-          sender() ! ChangeStatusSuccess
-        }
+          persist(PersistenceData(lastTodoId, todos)) { _ =>
+            sender() ! ChangeStatusSuccess
+          }
         case None =>
           sender() ! ChangeStatusFailure
       }
   }
+
+  override def persistenceId: String = "leveldb-persistence-actor"
 }

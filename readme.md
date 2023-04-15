@@ -1,6 +1,9 @@
 # Todo App using Akka Http with Scala
 
-Actor based Akka Http to build a simple yet powerful application
+Persistence Actor based Akka Http to build a simple yet powerful application. All data is stored as snapshots in localDB, such that each run of the application builds on top of it's previous data.
+
+## Uses
+Following application uses concepts from Akka's (Http, Persistence, Actor Model, etc)
 
 ## Supported routes
 ```markdown
@@ -13,3 +16,6 @@ Actor based Akka Http to build a simple yet powerful application
 ```
 
 See [Insomnia.json](./insomnia.json) for all requests/responses documentation.
+
+### Disclaimer
+Works with JDK 11. You might encounter some issues pertaining to levelDB with jdk 17+
